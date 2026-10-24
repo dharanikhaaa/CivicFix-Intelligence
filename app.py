@@ -16,6 +16,130 @@ st.set_page_config(
     layout="wide",
 )
 
+# --- CivicFix Smart City Theme ---
+st.markdown("""
+<style>
+    /* Main application */
+    .stApp {
+        background: linear-gradient(135deg, #0B1220 0%, #111C32 100%);
+        color: #F1F5F9;
+    }
+
+    /* General text visibility */
+    .stApp,
+    .stApp p,
+    .stApp label,
+    .stApp span,
+    .stApp li,
+    .stApp [data-testid="stMarkdownContainer"] {
+        color: #E2E8F0;
+    }
+
+    h1, h2, h3, h4 {
+        color: #F8FAFC !important;
+    }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: #080F1D;
+        border-right: 1px solid #263650;
+    }
+
+    [data-testid="stSidebar"] * {
+        color: #E2E8F0;
+    }
+
+    /* Metric cards */
+    [data-testid="stMetric"] {
+        background: #17243A;
+        border: 1px solid #2B3D58;
+        padding: 18px;
+        border-radius: 14px;
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: #CBD5E1 !important;
+    }
+
+    [data-testid="stMetricValue"] {
+        color: #38BDF8 !important;
+    }
+
+    [data-testid="stMetricDelta"] {
+        color: #4ADE80 !important;
+    }
+
+    /* Inputs */
+    .stTextInput input,
+    .stNumberInput input,
+    .stTextArea textarea,
+    .stDateInput input,
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stMultiSelect div[data-baseweb="select"] > div {
+        background-color: #17243A;
+        color: #F8FAFC;
+        border-color: #475569;
+    }
+
+    /* Buttons */
+    .stButton > button,
+    .stDownloadButton > button {
+        background: #1687F8;
+        color: #FFFFFF !important;
+        border: 1px solid #1687F8;
+        border-radius: 9px;
+        font-weight: 600;
+    }
+
+    .stButton > button:hover,
+    .stDownloadButton > button:hover {
+        background: #F59E0B;
+        color: #111827 !important;
+        border-color: #F59E0B;
+    }
+
+    /* Dataframes and tables */
+    [data-testid="stDataFrame"],
+    [data-testid="stTable"] {
+        background: #111C32 !important;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    [data-testid="stDataFrame"] *,
+    [data-testid="stTable"] * {
+        color: #E2E8F0;
+    }
+
+    /* Links */
+    .stApp a {
+        color: #38BDF8 !important;
+    }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        background: #111C32;
+        gap: 8px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        color: #CBD5E1;
+    }
+
+    .stTabs [aria-selected="true"] {
+        color: #38BDF8 !important;
+        border-bottom-color: #38BDF8 !important;
+    }
+
+    /* Dividers */
+    hr {
+        border-color: #334155;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
 st.title("🏙️ CivicFix")
 st.subheader("Smart Public Issue Tracking and Prioritization")
 
