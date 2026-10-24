@@ -1,6 +1,7 @@
 
 import re
-from difflib import SequenceMatcher
+from difflib 
+import SequenceMatcher
 
 
 def normalize_text(text):
