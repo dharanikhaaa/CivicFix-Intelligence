@@ -1,18 +1,20 @@
 
-import sqlite3
+import streamlit as st
 import pandas as pd
-
-DB_NAME = "civicfix.db"
+import psycopg
 
 
 def get_connection():
-    return sqlite3.connect(DB_NAME)
+    """Connect to the Supabase PostgreSQL database."""
+    database_url = st.secrets["SUPABASE_DB_URL"]
+    return psycopg.connect(database_url)
 
 
 def initialize_database():
+    """Create the issues table if it does not exist."""
     with get_connection() as conn:
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS issues (
+            CREATE TABLE IF NOT EXISTS public.issues (
                 id TEXT PRIMARY KEY,
                 issue TEXT NOT NULL,
                 location TEXT NOT NULL,
@@ -20,7 +22,7 @@ def initialize_database():
                 severity INTEGER NOT NULL,
                 people_affected INTEGER NOT NULL,
                 risk INTEGER NOT NULL,
-                repair_cost REAL NOT NULL,
+                repair_cost DOUBLE PRECISION NOT NULL,
                 days_waiting INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL DEFAULT 'Open'
             )
@@ -28,24 +30,34 @@ def initialize_database():
 
 
 def save_issue(issue):
+    """Save a complaint, rejecting duplicate reports."""
+    initialize_database()
+
     with get_connection() as conn:
+        duplicate = conn.execute("""
+            SELECT 1
+            FROM public.issues
+            WHERE LOWER(TRIM(issue)) = LOWER(TRIM(%s))
+              AND LOWER(TRIM(location)) = LOWER(TRIM(%s))
+              AND LOWER(TRIM(category)) = LOWER(TRIM(%s))
+            LIMIT 1
+        """, (
+            issue["issue"],
+            issue["location"],
+            issue["category"],
+        )).fetchone()
+
+        if duplicate:
+            return False
+
         conn.execute("""
-            INSERT INTO issues (
+            INSERT INTO public.issues (
                 id, issue, location, category, severity,
                 people_affected, risk, repair_cost,
                 days_waiting, status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                issue = excluded.issue,
-                location = excluded.location,
-                category = excluded.category,
-                severity = excluded.severity,
-                people_affected = excluded.people_affected,
-                risk = excluded.risk,
-                repair_cost = excluded.repair_cost,
-                days_waiting = excluded.days_waiting,
-                status = excluded.status
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
         """, (
             issue["id"],
             issue["issue"],
@@ -59,24 +71,44 @@ def save_issue(issue):
             issue["status"],
         ))
 
+        saved = conn.execute(
+            "SELECT 1 FROM public.issues WHERE id = %s",
+            (issue["id"],),
+        ).fetchone()
+
+        return saved is not None
+
 
 def load_saved_issues():
+    """Load complaints from Supabase into a DataFrame."""
     initialize_database()
 
     with get_connection() as conn:
-        return pd.read_sql_query(
-            "SELECT * FROM issues ORDER BY id",
-            conn,
-        )
+        rows = conn.execute("""
+            SELECT *
+            FROM public.issues
+            ORDER BY id
+        """).fetchall()
+
+        columns = [
+            "id", "issue", "location", "category", "severity",
+            "people_affected", "risk", "repair_cost",
+            "days_waiting", "status",
+        ]
+
+        return pd.DataFrame(rows, columns=columns)
+
 
 def update_issue_status(issue_id, new_status):
+    """Update a complaint's status."""
     allowed_statuses = ["Open", "In Progress", "Resolved"]
 
     if new_status not in allowed_statuses:
         raise ValueError("Invalid issue status")
 
     with get_connection() as conn:
-        conn.execute(
-            "UPDATE issues SET status = ? WHERE id = ?",
-            (new_status, issue_id),
-        )
+        conn.execute("""
+            UPDATE public.issues
+            SET status = %s
+            WHERE id = %s
+        """, (new_status, issue_id))

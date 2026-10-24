@@ -1,8 +1,27 @@
 
-.venv/
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Secrets — never upload credentials to GitHub
 .streamlit/secrets.toml
+
+# Local databases and backups
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
 .env
-civicfix.db
+.env.*
+
+# IDE and OS files
+.vscode/
 .DS_Store
+Thumbs.db

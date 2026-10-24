@@ -169,6 +169,8 @@ graph = build_infrastructure_graph(issues)
 
 
 # Complaint submission form
+
+# Complaint submission form
 st.sidebar.divider()
 st.sidebar.subheader("Report a Civic Issue")
 
@@ -210,54 +212,62 @@ with st.sidebar.form("report_issue_form", clear_on_submit=True):
 
     submitted = st.form_submit_button("Submit Issue")
 
-    
-    if submitted:
-        if issue_name.strip() and location_name.strip():
-            next_number = len(st.session_state.get("submitted_issues", [])) + 6
+if submitted:
+    if not issue_name.strip() or not location_name.strip():
+        st.sidebar.error("Enter both the issue title and location.")
 
-            new_issue = {
-                "id": f"CF{next_number:03d}",
-                "issue": issue_name.strip(),
-                "location": location_name.strip(),
-                "category": category_name,
-                "severity": severity_value,
-                "people_affected": people_value,
-                "risk": risk_value,
-                "repair_cost": cost_value,
-                "days_waiting": 0,
-                "status": "Open",
-            }
-            
-            possible_duplicates = find_possible_duplicates(
-                new_issue,
-                issues,
+    else:
+        # Generate an ID higher than existing CF issue IDs.
+        existing_numbers = [
+            int(str(issue_id)[2:])
+            for issue_id in issues["id"].tolist()
+            if str(issue_id).startswith("CF")
+            and str(issue_id)[2:].isdigit()
+        ]
+
+        next_number = max(existing_numbers, default=0) + 1
+
+        new_issue = {
+            "id": f"CF{next_number:03d}",
+            "issue": issue_name.strip(),
+            "location": location_name.strip(),
+            "category": category_name,
+            "severity": severity_value,
+            "people_affected": int(people_value),
+            "risk": risk_value,
+            "repair_cost": float(cost_value),
+            "days_waiting": 0,
+            "status": "Open",
+        }
+
+        # Check for likely duplicates before saving.
+        possible_duplicates = find_possible_duplicates(
+            new_issue,
+            issues,
+        )
+
+        if possible_duplicates:
+            st.sidebar.warning(
+                "Duplicate detected! This complaint was not saved."
+            )
+            st.sidebar.dataframe(
+                pd.DataFrame(possible_duplicates),
+                hide_index=True,
             )
 
-            if possible_duplicates:
-                st.sidebar.warning(
-                    "Duplicate detected! This complaint was not saved."
-                )
-                st.sidebar.dataframe(
-                    pd.DataFrame(possible_duplicates),
-                    hide_index=True,
-                )
+        else:
+            # The database performs a second duplicate check.
+            saved = save_issue(new_issue)
 
-            else:
-                save_issue(new_issue)
-
+            if saved:
                 st.sidebar.success(
                     "Issue submitted and saved successfully!"
                 )
                 st.rerun()
-
-            if "submitted_issues" not in st.session_state:
-                st.session_state.submitted_issues = []
-
-            st.session_state.submitted_issues.append(new_issue)
-            st.sidebar.success("Issue saved permanently!")
-        else:
-            st.sidebar.error("Enter both the issue title and location.")
-
+            else:
+                st.sidebar.warning(
+                    "This complaint already exists and was not saved."
+                )
 
 # Sidebar navigation and filters.
 st.sidebar.title("CivicFix Navigation")
