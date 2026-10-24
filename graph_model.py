@@ -3,75 +3,45 @@ import networkx as nx
 
 
 def build_infrastructure_graph(issues):
-    """
-    Build a graph connecting civic issues to their locations
-    and related infrastructure.
-    """
-
+    """Build a graph connecting civic issues to locations."""
     graph = nx.Graph()
 
+    # Add issue and location nodes.
     for _, issue in issues.iterrows():
-        issue_id = issue["id"]
-        location = issue["location"]
-        category = issue["category"]
-
-        # Add the issue as a node.
-        graph.add_node(
-            issue_id,
-            node_type="issue",
-            label=issue["issue"],
-            category=category,
-            risk=issue["risk"],
+        issue_id = str(issue["id"])
+        location = " ".join(
+            str(issue["location"]).strip().lower().split()
         )
 
-        # Add the location as a node.
-        graph.add_node(
-            location,
-            node_type="location",
-            label=location,
-        )
+        graph.add_node(issue_id, node_type="issue")
+        graph.add_node(location, node_type="location")
 
-        # Connect the issue to its location.
         graph.add_edge(
             issue_id,
             location,
             relationship="reported_at",
         )
 
-    # Example infrastructure relationships.
-    # These are hypothetical links for our prototype.
-    related_infrastructure = [
-        ("CF003", "CF005", "possible_shared_area"),
-        ("CF001", "CF004", "nearby_road_network"),
+    # Add hypothetical relationships between nearby issues.
+    issue_nodes = [
+        node
+        for node, attributes in graph.nodes(data=True)
+        if attributes.get("node_type") == "issue"
     ]
 
-    for source, target, relationship in related_infrastructure:
-        if source in graph and target in graph:
-            graph.add_edge(
-                source,
-                target,
-                relationship=relationship,
-            )
+    for i in range(len(issue_nodes) - 1):
+        graph.add_edge(
+            issue_nodes[i],
+            issue_nodes[i + 1],
+            relationship="related_issue",
+        )
 
     return graph
 
 
 def get_related_issues(graph, issue_id):
-    """Return issues directly connected to a given issue."""
-
+    """Return neighboring nodes connected to an issue."""
     if issue_id not in graph:
         return []
 
-    related = []
-
-    for neighbor in graph.neighbors(issue_id):
-        if graph.nodes[neighbor].get("node_type") == "issue":
-            related.append({
-                "id": neighbor,
-                "issue": graph.nodes[neighbor].get("label"),
-                "relationship": graph.edges[issue_id, neighbor].get(
-                    "relationship"
-                ),
-            })
-
-    return related
+    return list(graph.neighbors(issue_id))

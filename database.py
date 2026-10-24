@@ -68,3 +68,15 @@ def load_saved_issues():
             "SELECT * FROM issues ORDER BY id",
             conn,
         )
+
+def update_issue_status(issue_id, new_status):
+    allowed_statuses = ["Open", "In Progress", "Resolved"]
+
+    if new_status not in allowed_statuses:
+        raise ValueError("Invalid issue status")
+
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE issues SET status = ? WHERE id = ?",
+            (new_status, issue_id),
+        )

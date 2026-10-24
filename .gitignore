@@ -1,6 +1,8 @@
+
+.venv/
 __pycache__/
 *.py[cod]
-.venv/
-venv/
+.streamlit/secrets.toml
+.env
 civicfix.db
-*.db
+.DS_Store

@@ -1,3 +1,6 @@
+from database import update_issue_status
+from duplicate_detector import find_possible_duplicates
+from budget_optimizer import optimize_repair_budget
 from database import initialize_database, save_issue, load_saved_issues
 import streamlit as st
 import pandas as pd
@@ -100,8 +103,28 @@ with st.sidebar.form("report_issue_form", clear_on_submit=True):
                 "days_waiting": 0,
                 "status": "Open",
             }
+            
+            possible_duplicates = find_possible_duplicates(
+                new_issue,
+                issues,
+            )
 
-            save_issue(new_issue)
+            if possible_duplicates:
+                st.sidebar.warning(
+                    "Duplicate detected! This complaint was not saved."
+                )
+                st.sidebar.dataframe(
+                    pd.DataFrame(possible_duplicates),
+                    hide_index=True,
+                )
+
+            else:
+                save_issue(new_issue)
+
+                st.sidebar.success(
+                    "Issue submitted and saved successfully!"
+                )
+                st.rerun()
 
             if "submitted_issues" not in st.session_state:
                 st.session_state.submitted_issues = []
@@ -115,15 +138,19 @@ with st.sidebar.form("report_issue_form", clear_on_submit=True):
 # Sidebar navigation and filters.
 st.sidebar.title("CivicFix Navigation")
 
+
 page = st.sidebar.radio(
     "Choose a page",
     [
         "Dashboard",
         "Issue Explorer",
         "Infrastructure Network",
+        "Manage Issues",
+        "Budget Optimizer",
         "About",
     ],
 )
+
 
 categories = ["All"] + sorted(issues["category"].unique().tolist())
 
@@ -141,6 +168,7 @@ if selected_category != "All":
 
 # Dashboard.
 if page == "Dashboard":
+    
     st.header("Civic Overview")
 
     col1, col2, col3, col4 = st.columns(4)
@@ -190,7 +218,7 @@ if page == "Dashboard":
     category_counts = issues["category"].value_counts()
     st.bar_chart(category_counts)
 
-# Issue Explorer.
+# Issue Explorer.       
 elif page == "Issue Explorer":
     st.header("🔎 Issue Explorer")
 
@@ -245,40 +273,213 @@ elif page == "Issue Explorer":
             st.info("No directly connected issues found.")
 
 # Infrastructure Network.
+
 elif page == "Infrastructure Network":
     st.header("🕸️ Infrastructure Network")
 
     st.write(
-        "Explore connections between reported issues. "
-        "The example relationships are hypothetical."
+        "Explore connections between reported civic issues "
+        "and infrastructure locations. Example relationships "
+        "between issues are hypothetical."
     )
 
-    graph_data = []
+    import matplotlib.pyplot as plt
+    import networkx as nx
 
-    for source, target, attributes in graph.edges(data=True):
-        graph_data.append({
+    if graph.number_of_nodes() == 0:
+        st.info("No network data is available yet.")
+    else:
+        fig, ax = plt.subplots(figsize=(16, 10))
+
+        pos = nx.spring_layout(
+            graph,
+            seed=42,
+            k=2.0,
+            iterations=100,
+        )
+
+        node_colors = []
+        for node in graph.nodes():
+            if str(node).startswith("CF"):
+                node_colors.append("tomato")
+            else:
+                node_colors.append("skyblue")
+
+        nx.draw_networkx(
+            graph,
+            pos,
+            ax=ax,
+            with_labels=True,
+            node_color=node_colors,
+            node_size=1400,
+            font_size=9,
+            font_weight="bold",
+            edge_color="gray",
+            width=1.5,
+        )
+
+        edge_labels = {
+            (source, target): attributes.get(
+                "relationship", "connected"
+            )
+            for source, target, attributes in graph.edges(data=True)
+        }
+
+        nx.draw_networkx_edge_labels(
+            graph,
+            pos,
+            edge_labels=edge_labels,
+            ax=ax,
+            font_size=7,
+        )
+
+        ax.set_axis_off()
+        st.pyplot(fig)
+        plt.close(fig)
+
+        st.caption(
+            "Red nodes represent issue IDs; blue nodes represent "
+            "locations. Relationship labels describe the connections."
+        )
+
+    st.subheader("Connection Details")
+
+    graph_data = [
+        {
             "Source": str(source),
             "Relationship": attributes.get("relationship", "connected"),
             "Connected To": str(target),
-        })
+        }
+        for source, target, attributes in graph.edges(data=True)
+    ]
 
-    st.dataframe(
-        pd.DataFrame(graph_data),
-        use_container_width=True,
-        hide_index=True,
-    )
+    if graph_data:
+        st.dataframe(
+            pd.DataFrame(graph_data),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No connections to display.")
 
-    st.write("**Graph nodes:**", graph.number_of_nodes())
-    st.write("**Graph connections:**", graph.number_of_edges())
+    col1, col2 = st.columns(2)
+    col1.metric("Graph Nodes", graph.number_of_nodes())
+    col2.metric("Graph Connections", graph.number_of_edges())
 
 # About.
+
+elif page == "Manage Issues":
+    st.header("Manage Civic Issues")
+    st.write("Update the progress of reported complaints.")
+
+    if issues.empty:
+        st.info("No issues available.")
+    else:
+        selected_id = st.selectbox(
+            "Select issue",
+            issues["id"].tolist(),
+            key="manage_issue_id",
+        )
+
+        selected_issue = issues[
+            issues["id"] == selected_id
+        ].iloc[0]
+
+        st.write("**Issue:**", selected_issue["issue"])
+        st.write("**Location:**", selected_issue["location"])
+        st.write("**Current status:**", selected_issue["status"])
+
+        statuses = ["Open", "In Progress", "Resolved"]
+
+        current_status = selected_issue["status"]
+        default_index = (
+            statuses.index(current_status)
+            if current_status in statuses
+            else 0
+        )
+
+        new_status = st.selectbox(
+            "New status",
+            statuses,
+            index=default_index,
+        )
+
+        if st.button("Save Status"):
+            if selected_id in saved_issues["id"].values:
+                update_issue_status(selected_id, new_status)
+                st.success("Status updated successfully!")
+                st.rerun()
+            else:
+                st.warning(
+                    "This is a sample issue. Status updates are "
+                    "available only for saved database complaints."
+                )
+
+elif page == "Budget Optimizer":
+    st.header("Municipal Repair Budget Optimizer")
+
+    st.write(
+        "Select a budget to find a combination of repairs "
+        "with the highest combined priority score."
+    )
+
+    budget = st.number_input(
+        "Available repair budget (₹)",
+        min_value=0,
+        value=20000,
+        step=1000,
+    )
+
+    if st.button("Optimize Repairs"):
+        selected, total_cost = optimize_repair_budget(
+            ranked_issues,
+            budget,
+        )
+
+        if selected.empty:
+            st.warning(
+                "No eligible repairs fit within this budget."
+            )
+        else:
+            st.subheader("Recommended Repairs")
+
+            st.dataframe(
+                selected[
+                    ["id", "issue", "location",
+                     "repair_cost", "priority_score"]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.metric(
+                "Total Estimated Cost",
+                f"₹{total_cost:,.0f}",
+            )
+
+            st.metric(
+                "Remaining Budget",
+                f"₹{budget - total_cost:,.0f}",
+            )
+
+            st.metric(
+                "Repairs Selected",
+                len(selected),
+            )
+
+            st.caption(
+                "This is a prototype recommendation. "
+                "Safety-critical emergencies should be handled "
+                "according to emergency procedures, regardless "
+                "of the optimization score."
+            )
+
 elif page == "About":
     st.header("About CivicFix")
 
     st.write(
-        "CivicFix is a prototype public issue tracking system "
-        "designed to organize infrastructure complaints and "
-        "estimate repair priorities."
+        "CivicFix organizes public infrastructure complaints, "
+        "estimates repair priorities, and tracks issue progress."
     )
 
     st.markdown("""
@@ -286,12 +487,8 @@ elif page == "About":
     - Civic issue dashboard
     - Weighted repair-priority scoring
     - Category filtering
-    - Issue details and related-issue lookup
-    - Infrastructure relationship table
-
-    **Prototype limitations**
-    - Uses fictional sample data
-    - Does not yet accept or store new public reports
-    - Does not connect to municipal systems
-    - Does not verify infrastructure relationships
+    - Complaint submission
+    - SQLite storage for submitted complaints
+    - Issue status management
+    - Infrastructure relationship modeling
     """)
